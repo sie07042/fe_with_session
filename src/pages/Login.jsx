@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import useAuth from '../hooks/useAuth';
 
 // axios 기본 설정: 쿠키를 포함하여 요청 전송
 axios.defaults.withCredentials = true;
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -26,6 +28,11 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!formData.password) {
+      setErrorMessage('비밀번호를 입력하세요');
+      return;
+    }
+
     const loginData = {
       email: formData.email,
       password: formData.password
@@ -34,17 +41,21 @@ function Login() {
     try {
       setLoading(true);
       const response = await axios.post('/api/users/login', loginData, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
         withCredentials: true
       });
-      console.log('로그인 성공:', response.data);
-      
-      alert('로그인에 성공했습니다!');
-      navigate('/');
-      
-      // navigate 후에 이벤트 발생 (Home 컴포넌트가 마운트된 후)
-      setTimeout(() => {
-        window.dispatchEvent(new Event('userUpdated'));
-      }, 200);
+
+      if (response.data.status === 'success') {
+        // Context의 login 함수를 호출하여 사용자 정보 저장
+        // 응답 구조에 따라 response.data.data 또는 response.data.content 사용
+        const userData = response.data.data || response.data.content || response.data;
+        login(userData);
+        navigate('/');
+      } else {
+        setErrorMessage(response.data.message || '로그인에 실패했습니다. 다시 시도해주세요.');
+      }
     } catch (error) {
       console.error('로그인 실패:', error.response || error);
       setErrorMessage(error.response?.data?.message || '로그인에 실패했습니다. 이메일과 패스워드를 확인해주세요.');
